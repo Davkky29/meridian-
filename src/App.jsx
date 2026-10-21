@@ -148,7 +148,8 @@ textarea {
 }
 
 .nav-links a:hover,
-.link-button:hover, .inline-link:hover {
+.link-button:hover,
+.inline-link:hover {
   color: var(--text);
 }
 

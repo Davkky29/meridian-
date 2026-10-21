@@ -30,7 +30,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('Pro');
   const [authState, setAuthState] = useState({ token: '', user: null });
-  const [dashboardData, setDashboardData] = useState({ stats: {}, rewrites: [] });
+  const [dashboardData, setDashboardData] = useState({ user: null, rewrites: [], stats: {} });
   const [authMode, setAuthMode] = useState('signup');
   const [authError, setAuthError] = useState('');
   const [contactStatus, setContactStatus] = useState('');
@@ -68,7 +68,7 @@ function App() {
   useEffect(() => {
     if (authState.token && authState.user) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(authState));
-    } else if (!authState.token) {
+    } else {
       localStorage.removeItem(STORAGE_KEY);
     }
   }, [authState]);
@@ -85,10 +85,10 @@ function App() {
         headers: { Authorization: `Bearer ${authState.token}` },
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Unable to load dashboard');
+      if (!response.ok) throw new Error(data.message || 'Unable to load dashboard.');
       setDashboardData(data);
     } catch (error) {
-      setAuthError(error.message || 'Unable to load dashboard');
+      setAuthError(error.message || 'Unable to load dashboard.');
     }
   }
 
@@ -145,8 +145,8 @@ function App() {
 
   async function handleAuthSubmit(event) {
     event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
+    const formData = new FormData(event.currentTarget);
+
     const payload = {
       name: formData.get('name') || '',
       email: formData.get('email') || '',
@@ -166,7 +166,7 @@ function App() {
 
       setAuthState({ token: data.token, user: data.user });
       setAuthError('');
-      form.reset();
+      event.currentTarget.reset();
       window.location.hash = '#/dashboard';
     } catch (error) {
       setAuthError(error.message || 'Authentication failed.');
@@ -219,298 +219,299 @@ function App() {
     }
   }
 
-  const isDashboardRoute = route === '#/dashboard';
-  const isAuthRoute = route === '#/login' || route === '#/signup';
+  const routeView = (() => {
+    if (route === '#/login' || route === '#/signup') {
+      return (
+        <div className="auth-shell">
+          <div className="auth-card">
+            <div className="auth-header">
+              <span className="eyebrow">{authMode === 'signup' ? 'Create account' : 'Welcome back'}</span>
+              <h2>{authMode === 'signup' ? 'Start your premium workspace' : 'Sign in to your dashboard'}</h2>
+            </div>
 
-  const renderLanding = () => (
-    <>
-      <section className="hero">
-        <div className="container hero-grid">
-          <div className="hero-copy">
-            <span className="eyebrow">Premium AI text refinement</span>
-            <h1>Make every sentence sound clear, polished, and human.</h1>
-            <p>
-              Humanizer AI transforms stiff, mechanical content into elegant, persuasive copy that feels like it was written by a real expert—not a template.
+            <form onSubmit={handleAuthSubmit} className="auth-form">
+              {authMode === 'signup' && (
+                <input name="name" type="text" placeholder="Full name" required />
+              )}
+              <input name="email" type="email" placeholder="Email address" required />
+              <input name="password" type="password" placeholder="Password" required />
+              {authError && <p className="status-message error">{authError}</p>}
+
+              <button type="submit" className="primary-button full-width">
+                {authMode === 'signup' ? 'Create account' : 'Sign in'}
+              </button>
+            </form>
+
+            <p className="switch-link">
+              {authMode === 'signup' ? 'Already have an account?' : 'Need an account?'}{' '}
+              <button type="button" className="inline-link" onClick={() => setAuthMode(authMode === 'signup' ? 'login' : 'signup')}>
+                {authMode === 'signup' ? 'Sign in' : 'Create one'}
+              </button>
             </p>
-
-            <div className="cta-row">
-              <a href="#/demo" className="primary-button">Try the demo</a>
-              <a href="#/pricing" className="secondary-button">See plans</a>
-            </div>
-
-            <ul className="trust-list">
-              <li>Luxury brand voice</li>
-              <li>Fast AI rewriting</li>
-              <li>Built for premium teams</li>
-            </ul>
-          </div>
-
-          <div className="demo-panel" id="demo">
-            <div className="panel-head">
-              <span className="status-pill">Live rewrite</span>
-            </div>
-
-            <div className="tone-row">
-              <label htmlFor="toneSelect">Tone</label>
-              <select id="toneSelect" value={tone} onChange={(event) => setTone(event.target.value)}>
-                {toneOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <textarea value={sourceText} onChange={(event) => setSourceText(event.target.value)} rows={7} aria-label="Text to humanize" />
-
-            <div className="panel-actions">
-              <button className="primary-button" onClick={handleHumanize} disabled={loading}>
-                {loading ? 'Rewriting...' : 'Humanize text'}
-              </button>
-              <button className="ghost-button" onClick={() => { setSourceText(defaultText); setResult('Our platform helps businesses move faster, think more clearly, and turn new ideas into real momentum.'); }}>
-                Reset
-              </button>
-            </div>
-
-            <textarea value={result} readOnly rows={7} aria-label="Humanized output" />
-            {authState.token && (
-              <button className="secondary-button full-width save-button" onClick={handleSaveRewrite}>
-                Save to dashboard
-              </button>
-            )}
           </div>
         </div>
-      </section>
+      );
+    }
 
-      <section className="logo-strip">
-        <div className="container strip-items">
-          <span>Veloura</span>
-          <span>Northstar</span>
-          <span>Atlas Co.</span>
-          <span>Luma Labs</span>
-          <span>Verve</span>
-        </div>
-      </section>
-
-      <section className="section" id="features">
-        <div className="container">
-          <div className="section-header">
-            <span className="eyebrow">Why teams choose it</span>
-            <h2>Luxury-level language refinement without the luxury price tag.</h2>
+    if (route === '#/dashboard') {
+      if (!authState.token || !authState.user) {
+        return (
+          <div className="dashboard-empty container">
+            <h2>Sign in to access your dashboard</h2>
+            <button className="primary-button" onClick={() => { window.location.hash = '#/login'; }}>Go to login</button>
           </div>
+        );
+      }
 
-          <div className="feature-grid">
-            {featureCards.map((card) => (
-              <article className="feature-card" key={card.title}>
-                <div className="icon">{card.icon}</div>
-                <h3>{card.title}</h3>
-                <p>{card.text}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section alt-bg" id="workflow">
-        <div className="container">
-          <div className="section-header left">
-            <span className="eyebrow">Workflow</span>
-            <h2>Three steps from awkward draft to premium copy.</h2>
-          </div>
-
-          <div className="timeline">
-            <div className="step-card">
-              <span className="step-number">01</span>
-              <h3>Paste your text</h3>
-              <p>Drop in a sentence, paragraph, or brief from your marketing workflow.</p>
+      return (
+        <div className="dashboard-shell container">
+          <div className="dashboard-header">
+            <div>
+              <span className="eyebrow">Workspace</span>
+              <h2>Welcome back, {authState.user.name}</h2>
             </div>
-            <div className="step-card">
-              <span className="step-number">02</span>
-              <h3>Choose your tone</h3>
-              <p>Switch between luxury, direct, or friendly phrasing to match your brand.</p>
+            <button className="secondary-button" onClick={() => setAuthState({ token: '', user: null })}>Log out</button>
+          </div>
+
+          <div className="stats-grid">
+            <div className="stat-card">
+              <span>Total rewrites</span>
+              <strong>{dashboardData.stats.totalRewrites || 0}</strong>
             </div>
-            <div className="step-card">
-              <span className="step-number">03</span>
-              <h3>Publish confidently</h3>
-              <p>Use sharper, more natural copy for launches, landing pages, and sales messaging.</p>
+            <div className="stat-card">
+              <span>Current plan</span>
+              <strong>{dashboardData.user?.plan || authState.user.plan || 'free'}</strong>
+            </div>
+            <div className="stat-card">
+              <span>Saved contacts</span>
+              <strong>{dashboardData.stats.contactCount || 0}</strong>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section className="section" id="pricing">
-        <div className="container">
-          <div className="section-header">
-            <span className="eyebrow">Simple pricing</span>
-            <h2>Clear plans for individuals, founders, and teams.</h2>
-          </div>
-
-          <div className="pricing-grid">
-            {pricingPlans.map((plan) => (
-              <article className={`price-card ${plan.featured ? 'featured' : ''}`} key={plan.name}>
-                {plan.featured && <div className="featured-badge">Most popular</div>}
-                <p className="plan-name">{plan.name}</p>
-                <div className="price-line">
-                  <span>{plan.price}</span>
-                  <small>{plan.note}</small>
-                </div>
-                <ul>
-                  {plan.items.map((item) => (
-                    <li key={item}>{item}</li>
+          <div className="dashboard-grid">
+            <div className="dashboard-panel">
+              <h3>Recent rewrites</h3>
+              {dashboardData.rewrites?.length ? (
+                <ul className="rewrite-list">
+                  {dashboardData.rewrites.map((rewrite) => (
+                    <li key={rewrite.id}>
+                      <div className="rewrite-tag">{rewrite.tone}</div>
+                      <p>{rewrite.output}</p>
+                      <small>{new Date(rewrite.created_at).toLocaleString()}</small>
+                    </li>
                   ))}
                 </ul>
-                <button className={plan.featured ? 'primary-button full-width' : 'secondary-button full-width'} onClick={() => { setSelectedPlan(plan.name); handleBilling(); }}>
-                  {plan.action}
-                </button>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section alt-bg" id="reviews">
-        <div className="container">
-          <div className="section-header">
-            <span className="eyebrow">Client feedback</span>
-            <h2>Trusted by brands that care about how they sound.</h2>
-          </div>
-
-          <div className="review-grid">
-            {reviewCards.map((review) => (
-              <blockquote className="review-card" key={review.author}>
-                <p>“{review.quote}”</p>
-                <footer>
-                  <strong>{review.author}</strong>
-                  <span>{review.role}</span>
-                </footer>
-              </blockquote>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section contact-section" id="contact">
-        <div className="container contact-grid">
-          <div className="contact-copy">
-            <span className="eyebrow">Find your voice</span>
-            <h2>Need better copy for a launch, campaign, or homepage?</h2>
-            <p>
-              Tell us what you’re building and we’ll help you turn rough drafts into premium messaging that sounds credible and confident.
-            </p>
-          </div>
-
-          <form className="contact-form" onSubmit={handleContactSubmit}>
-            <div className="field-row">
-              <input type="text" placeholder="Your name" value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} required />
-              <input type="email" placeholder="Email address" value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} required />
+              ) : (
+                <p className="muted-text">No rewrites saved yet. Try the demo and save your first version.</p>
+              )}
             </div>
 
-            <input type="text" placeholder="Company or brand" value={contactForm.company} onChange={(event) => setContactForm({ ...contactForm, company: event.target.value })} />
-            <textarea rows={5} placeholder="Tell us about your project" value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} required />
-            <button type="submit" className="primary-button full-width">Send request</button>
-            {contactStatus && <p className="status-message">{contactStatus}</p>}
-          </form>
-        </div>
-      </section>
-    </>
-  );
-
-  const renderAuth = () => (
-    <div className="auth-shell">
-      <div className="auth-card">
-        <div className="auth-header">
-          <span className="eyebrow">{authMode === 'signup' ? 'Create account' : 'Welcome back'}</span>
-          <h2>{authMode === 'signup' ? 'Start your premium workspace' : 'Sign in to your dashboard'}</h2>
-        </div>
-
-        <form onSubmit={handleAuthSubmit} className="auth-form">
-          {authMode === 'signup' && (
-            <input name="name" type="text" placeholder="Full name" required />
-          )}
-          <input name="email" type="email" placeholder="Email address" required />
-          <input name="password" type="password" placeholder="Password" required />
-          {authError && <p className="status-message error">{authError}</p>}
-
-          <button type="submit" className="primary-button full-width">
-            {authMode === 'signup' ? 'Create account' : 'Sign in'}
-          </button>
-        </form>
-
-        <p className="switch-link">
-          {authMode === 'signup' ? 'Already have an account?' : 'Need an account?'}{' '}
-          <button type="button" className="inline-link" onClick={() => setAuthMode(authMode === 'signup' ? 'login' : 'signup')}>
-            {authMode === 'signup' ? 'Sign in' : 'Create one'}
-          </button>
-        </p>
-      </div>
-    </div>
-  );
-
-  const renderDashboard = () => {
-    if (!authState.token || !authState.user) {
-      return (
-        <div className="dashboard-empty">
-          <h2>Sign in to access your dashboard</h2>
-          <button className="primary-button" onClick={() => window.location.hash = '#/login'}>Go to login</button>
+            <div className="dashboard-panel">
+              <h3>Upgrade</h3>
+              <p className="muted-text">Unlock unlimited rewrites, premium tones, and team collaboration features.</p>
+              <button className="primary-button full-width" onClick={handleBilling}>Upgrade to Pro</button>
+            </div>
+          </div>
         </div>
       );
     }
 
     return (
-      <div className="dashboard-shell container">
-        <div className="dashboard-header">
-          <div>
-            <span className="eyebrow">Workspace</span>
-            <h2>Welcome back, {authState.user.name}</h2>
-          </div>
-          <button className="secondary-button" onClick={() => setAuthState({ token: '', user: null })}>Log out</button>
-        </div>
+      <>
+        <section className="hero">
+          <div className="container hero-grid">
+            <div className="hero-copy">
+              <span className="eyebrow">Premium AI text refinement</span>
+              <h1>Make every sentence sound clear, polished, and human.</h1>
+              <p>
+                Humanizer AI transforms stiff, mechanical content into elegant, persuasive copy that feels like it was written by a real expert—not a template.
+              </p>
 
-        <div className="stats-grid">
-          <div className="stat-card">
-            <span>Total rewrites</span>
-            <strong>{dashboardData.stats.totalRewrites || 0}</strong>
-          </div>
-          <div className="stat-card">
-            <span>Current plan</span>
-            <strong>{dashboardData.user?.plan || authState.user.plan || 'free'}</strong>
-          </div>
-          <div className="stat-card">
-            <span>Saved contacts</span>
-            <strong>{dashboardData.stats.contactCount || 0}</strong>
-          </div>
-        </div>
+              <div className="cta-row">
+                <a href="#/demo" className="primary-button">Try the demo</a>
+                <a href="#/pricing" className="secondary-button">See plans</a>
+              </div>
 
-        <div className="dashboard-grid">
-          <div className="dashboard-panel">
-            <h3>Recent rewrites</h3>
-            {dashboardData.rewrites?.length ? (
-              <ul className="rewrite-list">
-                {dashboardData.rewrites.map((rewrite) => (
-                  <li key={rewrite.id}>
-                    <div className="rewrite-tag">{rewrite.tone}</div>
-                    <p>{rewrite.output}</p>
-                    <small>{new Date(rewrite.created_at).toLocaleString()}</small>
-                  </li>
-                ))}
+              <ul className="trust-list">
+                <li>Luxury brand voice</li>
+                <li>Fast AI rewriting</li>
+                <li>Built for premium teams</li>
               </ul>
-            ) : (
-              <p className="muted-text">No rewrites saved yet. Try the demo and save your first version.</p>
-            )}
-          </div>
+            </div>
 
-          <div className="dashboard-panel">
-            <h3>Upgrade</h3>
-            <p className="muted-text">Unlock unlimited rewrites, premium tones, and team collaboration features.</p>
-            <button className="primary-button full-width" onClick={handleBilling}>Upgrade to Pro</button>
+            <div className="demo-panel" id="demo">
+              <div className="panel-head">
+                <span className="status-pill">Live rewrite</span>
+              </div>
+
+              <div className="tone-row">
+                <label htmlFor="toneSelect">Tone</label>
+                <select id="toneSelect" value={tone} onChange={(event) => setTone(event.target.value)}>
+                  {toneOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <textarea value={sourceText} onChange={(event) => setSourceText(event.target.value)} rows={7} aria-label="Text to humanize" />
+
+              <div className="panel-actions">
+                <button className="primary-button" onClick={handleHumanize} disabled={loading}>
+                  {loading ? 'Rewriting...' : 'Humanize text'}
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    setSourceText(defaultText);
+                    setResult('Our platform helps businesses move faster, think more clearly, and turn new ideas into real momentum.');
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+
+              <textarea value={result} readOnly rows={7} aria-label="Humanized output" />
+              {authState.token && (
+                <button className="secondary-button full-width save-button" onClick={handleSaveRewrite}>
+                  Save to dashboard
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        </section>
+
+        <section className="logo-strip">
+          <div className="container strip-items">
+            <span>Veloura</span>
+            <span>Northstar</span>
+            <span>Atlas Co.</span>
+            <span>Luma Labs</span>
+            <span>Verve</span>
+          </div>
+        </section>
+
+        <section className="section" id="features">
+          <div className="container">
+            <div className="section-header">
+              <span className="eyebrow">Why teams choose it</span>
+              <h2>Luxury-level language refinement without the luxury price tag.</h2>
+            </div>
+
+            <div className="feature-grid">
+              {featureCards.map((card) => (
+                <article className="feature-card" key={card.title}>
+                  <div className="icon">{card.icon}</div>
+                  <h3>{card.title}</h3>
+                  <p>{card.text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section alt-bg" id="workflow">
+          <div className="container">
+            <div className="section-header left">
+              <span className="eyebrow">Workflow</span>
+              <h2>Three steps from awkward draft to premium copy.</h2>
+            </div>
+
+            <div className="timeline">
+              <div className="step-card">
+                <span className="step-number">01</span>
+                <h3>Paste your text</h3>
+                <p>Drop in a sentence, paragraph, or brief from your marketing workflow.</p>
+              </div>
+              <div className="step-card">
+                <span className="step-number">02</span>
+                <h3>Choose your tone</h3>
+                <p>Switch between luxury, direct, or friendly phrasing to match your brand.</p>
+              </div>
+              <div className="step-card">
+                <span className="step-number">03</span>
+                <h3>Publish confidently</h3>
+                <p>Use sharper, more natural copy for launches, landing pages, and sales messaging.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="pricing">
+          <div className="container">
+            <div className="section-header">
+              <span className="eyebrow">Simple pricing</span>
+              <h2>Clear plans for individuals, founders, and teams.</h2>
+            </div>
+
+            <div className="pricing-grid">
+              {pricingPlans.map((plan) => (
+                <article className={`price-card ${plan.featured ? 'featured' : ''}`} key={plan.name}>
+                  {plan.featured && <div className="featured-badge">Most popular</div>}
+                  <p className="plan-name">{plan.name}</p>
+                  <div className="price-line">
+                    <span>{plan.price}</span>
+                    <small>{plan.note}</small>
+                  </div>
+                  <ul>
+                    {plan.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                  <button className={plan.featured ? 'primary-button full-width' : 'secondary-button full-width'} onClick={() => { setSelectedPlan(plan.name); handleBilling(); }}>
+                    {plan.action}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section alt-bg" id="reviews">
+          <div className="container">
+            <div className="section-header">
+              <span className="eyebrow">Client feedback</span>
+              <h2>Trusted by brands that care about how they sound.</h2>
+            </div>
+
+            <div className="review-grid">
+              {reviewCards.map((review) => (
+                <blockquote className="review-card" key={review.author}>
+                  <p>“{review.quote}”</p>
+                  <footer>
+                    <strong>{review.author}</strong>
+                    <span>{review.role}</span>
+                  </footer>
+                </blockquote>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section contact-section" id="contact">
+          <div className="container contact-grid">
+            <div className="contact-copy">
+              <span className="eyebrow">Find your voice</span>
+              <h2>Need better copy for a launch, campaign, or homepage?</h2>
+              <p>
+                Tell us what you’re building and we’ll help you turn rough drafts into premium messaging that sounds credible and confident.
+              </p>
+            </div>
+
+            <form className="contact-form" onSubmit={handleContactSubmit}>
+              <div className="field-row">
+                <input type="text" placeholder="Your name" value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} required />
+                <input type="email" placeholder="Email address" value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} required />
+              </div>
+
+              <input type="text" placeholder="Company or brand" value={contactForm.company} onChange={(event) => setContactForm({ ...contactForm, company: event.target.value })} />
+              <textarea rows={5} placeholder="Tell us about your project" value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} required />
+              <button type="submit" className="primary-button full-width">Send request</button>
+              {contactStatus && <p className="status-message">{contactStatus}</p>}
+            </form>
+          </div>
+        </section>
+      </>
     );
-  };
-
-  const routeView = (() => {
-    if (route === '#/login' || route === '#/signup') return renderAuth();
-    if (route === '#/dashboard') return renderDashboard();
-    return renderLanding();
   })();
 
   return (

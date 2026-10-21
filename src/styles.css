@@ -1,82 +1,40 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const defaultText = `In today’s fast-paced digital landscape, it is important to note that our platform seamlessly empowers businesses to unlock new opportunities through innovative solutions that drive measurable results.`;
 
 const featureCards = [
-  {
-    icon: '✦',
-    title: 'Premium voice refinement',
-    text: 'Turn mechanical copy into elegant, persuasive language that feels authored by a real strategist.',
-  },
-  {
-    icon: '↗',
-    title: 'Sharper clarity',
-    text: 'Cut filler, simplify dense wording, and sharpen the message without losing brand depth.',
-  },
-  {
-    icon: '⚡',
-    title: 'Faster production',
-    text: 'Give your team quick, polished drafts for website copy, sales pages, emails, and launch assets.',
-  },
+  { icon: '✦', title: 'Premium voice refinement', text: 'Turn mechanical copy into elegant, persuasive language that feels authored by a real strategist.' },
+  { icon: '↗', title: 'Sharper clarity', text: 'Cut filler, simplify dense wording, and sharpen the message without losing brand depth.' },
+  { icon: '⚡', title: 'Faster production', text: 'Give your team quick, polished drafts for website copy, emails, and launch assets.' },
 ];
 
 const pricingPlans = [
-  {
-    name: 'Starter',
-    price: '$0',
-    note: '/month',
-    items: ['10 rewrites per month', 'Basic tone cleanup', 'One workspace'],
-    featured: false,
-    action: 'Start free',
-  },
-  {
-    name: 'Pro',
-    price: '$29',
-    note: '/month',
-    items: ['Unlimited rewrites', 'Brand voice presets', 'Priority output quality'],
-    featured: true,
-    action: 'Start trial',
-  },
-  {
-    name: 'Studio',
-    price: '$79',
-    note: '/month',
-    items: ['Team workspace', 'Shared templates', 'Priority support'],
-    featured: false,
-    action: 'Book demo',
-  },
+  { name: 'Starter', price: '$0', note: '/month', items: ['10 rewrites per month', 'Basic cleanup', '1 workspace'], featured: false, action: 'Start free' },
+  { name: 'Pro', price: '$29', note: '/month', items: ['Unlimited rewrites', 'Brand voice presets', 'Priority quality'], featured: true, action: 'Start trial' },
+  { name: 'Studio', price: '$79', note: '/month', items: ['Team workspace', 'Shared templates', 'Priority support'], featured: false, action: 'Book demo' },
 ];
 
 const reviewCards = [
-  {
-    quote: 'The copy quality feels editorial and premium. It turned our robotic drafts into language people actually trust.',
-    author: 'Maya Chen',
-    role: 'Brand Director',
-  },
-  {
-    quote: 'This is the first AI writing tool I’ve used that sounds confident without sounding artificial.',
-    author: 'Ethan Brooks',
-    role: 'Growth Lead',
-  },
-  {
-    quote: 'We use it for product messaging, campaigns, and investor updates. It saves hours and feels elevated.',
-    author: 'Priya Shah',
-    role: 'Marketing Partner',
-  },
+  { quote: 'The copy quality feels editorial and premium. It turned our robotic drafts into language people actually trust.', author: 'Maya Chen', role: 'Brand Director' },
+  { quote: 'This is the first AI writing tool I’ve used that sounds confident without sounding artificial.', author: 'Ethan Brooks', role: 'Growth Lead' },
+  { quote: 'We use it for product messaging, campaigns, and investor updates. It saves hours and feels elevated.', author: 'Priya Shah', role: 'Marketing Partner' },
 ];
 
+const STORAGE_KEY = 'humanizer-auth';
+
 function App() {
+  const [route, setRoute] = useState(window.location.hash || '#/');
   const [sourceText, setSourceText] = useState(defaultText);
-  const [result, setResult] = useState('Our platform helps businesses move faster, make smarter decisions, and turn challenging ideas into real momentum.');
+  const [result, setResult] = useState('Our platform helps businesses move faster, think more clearly, and turn new ideas into real momentum.');
   const [tone, setTone] = useState('luxury');
   const [loading, setLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('Pro');
+  const [authState, setAuthState] = useState({ token: '', user: null });
+  const [dashboardData, setDashboardData] = useState({ stats: {}, rewrites: [] });
+  const [authMode, setAuthMode] = useState('signup');
+  const [authError, setAuthError] = useState('');
   const [contactStatus, setContactStatus] = useState('');
-  const [contactForm, setContactForm] = useState({
-    name: '',
-    email: '',
-    company: '',
-    message: '',
-  });
+  const [contactForm, setContactForm] = useState({ name: '', email: '', company: '', message: '' });
 
   const toneOptions = useMemo(
     () => [
@@ -86,6 +44,53 @@ function App() {
     ],
     []
   );
+
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.token && parsed.user) {
+          setAuthState(parsed);
+        }
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const onHashChange = () => setRoute(window.location.hash || '#/');
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (authState.token && authState.user) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(authState));
+    } else if (!authState.token) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [authState]);
+
+  useEffect(() => {
+    if (authState.token && route === '#/dashboard') {
+      fetchDashboard();
+    }
+  }, [authState.token, route]);
+
+  async function fetchDashboard() {
+    try {
+      const response = await fetch('/api/dashboard', {
+        headers: { Authorization: `Bearer ${authState.token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Unable to load dashboard');
+      setDashboardData(data);
+    } catch (error) {
+      setAuthError(error.message || 'Unable to load dashboard');
+    }
+  }
 
   async function handleHumanize() {
     const trimmed = sourceText.trim();
@@ -104,15 +109,67 @@ function App() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to rewrite text.');
-
+      if (!response.ok) throw new Error(data.message || 'Unable to rewrite text.');
       setResult(data.text || trimmed);
     } catch (error) {
-      setResult(
-        'Our platform helps businesses move faster, think more clearly, and turn new ideas into measurable momentum.'
-      );
+      setResult('Our platform helps businesses move faster, think more clearly, and turn new ideas into real momentum.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSaveRewrite() {
+    if (!authState.token) {
+      window.location.hash = '#/login';
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/rewrites', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authState.token}`,
+        },
+        body: JSON.stringify({ input: sourceText, output: result, tone }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Could not save rewrite.');
+      fetchDashboard();
+      window.location.hash = '#/dashboard';
+    } catch (error) {
+      setAuthError(error.message || 'Could not save rewrite.');
+    }
+  }
+
+  async function handleAuthSubmit(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const payload = {
+      name: formData.get('name') || '',
+      email: formData.get('email') || '',
+      password: formData.get('password') || '',
+    };
+
+    try {
+      const endpoint = authMode === 'signup' ? '/api/signup' : '/api/login';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Authentication failed.');
+
+      setAuthState({ token: data.token, user: data.user });
+      setAuthError('');
+      form.reset();
+      window.location.hash = '#/dashboard';
+    } catch (error) {
+      setAuthError(error.message || 'Authentication failed.');
     }
   }
 
@@ -128,7 +185,6 @@ function App() {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Unable to send message.');
-
       setContactStatus(data.message || 'Message sent successfully.');
       setContactForm({ name: '', email: '', company: '', message: '' });
     } catch (error) {
@@ -136,248 +192,356 @@ function App() {
     }
   }
 
+  async function handleBilling() {
+    if (!authState.token) {
+      window.location.hash = '#/login';
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authState.token}`,
+        },
+        body: JSON.stringify({ plan: selectedPlan }),
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        window.location.hash = '#/dashboard';
+      }
+    } catch (error) {
+      setAuthError(error.message || 'Unable to start billing checkout.');
+    }
+  }
+
+  const isDashboardRoute = route === '#/dashboard';
+  const isAuthRoute = route === '#/login' || route === '#/signup';
+
+  const renderLanding = () => (
+    <>
+      <section className="hero">
+        <div className="container hero-grid">
+          <div className="hero-copy">
+            <span className="eyebrow">Premium AI text refinement</span>
+            <h1>Make every sentence sound clear, polished, and human.</h1>
+            <p>
+              Humanizer AI transforms stiff, mechanical content into elegant, persuasive copy that feels like it was written by a real expert—not a template.
+            </p>
+
+            <div className="cta-row">
+              <a href="#/demo" className="primary-button">Try the demo</a>
+              <a href="#/pricing" className="secondary-button">See plans</a>
+            </div>
+
+            <ul className="trust-list">
+              <li>Luxury brand voice</li>
+              <li>Fast AI rewriting</li>
+              <li>Built for premium teams</li>
+            </ul>
+          </div>
+
+          <div className="demo-panel" id="demo">
+            <div className="panel-head">
+              <span className="status-pill">Live rewrite</span>
+            </div>
+
+            <div className="tone-row">
+              <label htmlFor="toneSelect">Tone</label>
+              <select id="toneSelect" value={tone} onChange={(event) => setTone(event.target.value)}>
+                {toneOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <textarea value={sourceText} onChange={(event) => setSourceText(event.target.value)} rows={7} aria-label="Text to humanize" />
+
+            <div className="panel-actions">
+              <button className="primary-button" onClick={handleHumanize} disabled={loading}>
+                {loading ? 'Rewriting...' : 'Humanize text'}
+              </button>
+              <button className="ghost-button" onClick={() => { setSourceText(defaultText); setResult('Our platform helps businesses move faster, think more clearly, and turn new ideas into real momentum.'); }}>
+                Reset
+              </button>
+            </div>
+
+            <textarea value={result} readOnly rows={7} aria-label="Humanized output" />
+            {authState.token && (
+              <button className="secondary-button full-width save-button" onClick={handleSaveRewrite}>
+                Save to dashboard
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="logo-strip">
+        <div className="container strip-items">
+          <span>Veloura</span>
+          <span>Northstar</span>
+          <span>Atlas Co.</span>
+          <span>Luma Labs</span>
+          <span>Verve</span>
+        </div>
+      </section>
+
+      <section className="section" id="features">
+        <div className="container">
+          <div className="section-header">
+            <span className="eyebrow">Why teams choose it</span>
+            <h2>Luxury-level language refinement without the luxury price tag.</h2>
+          </div>
+
+          <div className="feature-grid">
+            {featureCards.map((card) => (
+              <article className="feature-card" key={card.title}>
+                <div className="icon">{card.icon}</div>
+                <h3>{card.title}</h3>
+                <p>{card.text}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section alt-bg" id="workflow">
+        <div className="container">
+          <div className="section-header left">
+            <span className="eyebrow">Workflow</span>
+            <h2>Three steps from awkward draft to premium copy.</h2>
+          </div>
+
+          <div className="timeline">
+            <div className="step-card">
+              <span className="step-number">01</span>
+              <h3>Paste your text</h3>
+              <p>Drop in a sentence, paragraph, or brief from your marketing workflow.</p>
+            </div>
+            <div className="step-card">
+              <span className="step-number">02</span>
+              <h3>Choose your tone</h3>
+              <p>Switch between luxury, direct, or friendly phrasing to match your brand.</p>
+            </div>
+            <div className="step-card">
+              <span className="step-number">03</span>
+              <h3>Publish confidently</h3>
+              <p>Use sharper, more natural copy for launches, landing pages, and sales messaging.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section" id="pricing">
+        <div className="container">
+          <div className="section-header">
+            <span className="eyebrow">Simple pricing</span>
+            <h2>Clear plans for individuals, founders, and teams.</h2>
+          </div>
+
+          <div className="pricing-grid">
+            {pricingPlans.map((plan) => (
+              <article className={`price-card ${plan.featured ? 'featured' : ''}`} key={plan.name}>
+                {plan.featured && <div className="featured-badge">Most popular</div>}
+                <p className="plan-name">{plan.name}</p>
+                <div className="price-line">
+                  <span>{plan.price}</span>
+                  <small>{plan.note}</small>
+                </div>
+                <ul>
+                  {plan.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                <button className={plan.featured ? 'primary-button full-width' : 'secondary-button full-width'} onClick={() => { setSelectedPlan(plan.name); handleBilling(); }}>
+                  {plan.action}
+                </button>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section alt-bg" id="reviews">
+        <div className="container">
+          <div className="section-header">
+            <span className="eyebrow">Client feedback</span>
+            <h2>Trusted by brands that care about how they sound.</h2>
+          </div>
+
+          <div className="review-grid">
+            {reviewCards.map((review) => (
+              <blockquote className="review-card" key={review.author}>
+                <p>“{review.quote}”</p>
+                <footer>
+                  <strong>{review.author}</strong>
+                  <span>{review.role}</span>
+                </footer>
+              </blockquote>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section contact-section" id="contact">
+        <div className="container contact-grid">
+          <div className="contact-copy">
+            <span className="eyebrow">Find your voice</span>
+            <h2>Need better copy for a launch, campaign, or homepage?</h2>
+            <p>
+              Tell us what you’re building and we’ll help you turn rough drafts into premium messaging that sounds credible and confident.
+            </p>
+          </div>
+
+          <form className="contact-form" onSubmit={handleContactSubmit}>
+            <div className="field-row">
+              <input type="text" placeholder="Your name" value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} required />
+              <input type="email" placeholder="Email address" value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} required />
+            </div>
+
+            <input type="text" placeholder="Company or brand" value={contactForm.company} onChange={(event) => setContactForm({ ...contactForm, company: event.target.value })} />
+            <textarea rows={5} placeholder="Tell us about your project" value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} required />
+            <button type="submit" className="primary-button full-width">Send request</button>
+            {contactStatus && <p className="status-message">{contactStatus}</p>}
+          </form>
+        </div>
+      </section>
+    </>
+  );
+
+  const renderAuth = () => (
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="auth-header">
+          <span className="eyebrow">{authMode === 'signup' ? 'Create account' : 'Welcome back'}</span>
+          <h2>{authMode === 'signup' ? 'Start your premium workspace' : 'Sign in to your dashboard'}</h2>
+        </div>
+
+        <form onSubmit={handleAuthSubmit} className="auth-form">
+          {authMode === 'signup' && (
+            <input name="name" type="text" placeholder="Full name" required />
+          )}
+          <input name="email" type="email" placeholder="Email address" required />
+          <input name="password" type="password" placeholder="Password" required />
+          {authError && <p className="status-message error">{authError}</p>}
+
+          <button type="submit" className="primary-button full-width">
+            {authMode === 'signup' ? 'Create account' : 'Sign in'}
+          </button>
+        </form>
+
+        <p className="switch-link">
+          {authMode === 'signup' ? 'Already have an account?' : 'Need an account?'}{' '}
+          <button type="button" className="inline-link" onClick={() => setAuthMode(authMode === 'signup' ? 'login' : 'signup')}>
+            {authMode === 'signup' ? 'Sign in' : 'Create one'}
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+
+  const renderDashboard = () => {
+    if (!authState.token || !authState.user) {
+      return (
+        <div className="dashboard-empty">
+          <h2>Sign in to access your dashboard</h2>
+          <button className="primary-button" onClick={() => window.location.hash = '#/login'}>Go to login</button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dashboard-shell container">
+        <div className="dashboard-header">
+          <div>
+            <span className="eyebrow">Workspace</span>
+            <h2>Welcome back, {authState.user.name}</h2>
+          </div>
+          <button className="secondary-button" onClick={() => setAuthState({ token: '', user: null })}>Log out</button>
+        </div>
+
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span>Total rewrites</span>
+            <strong>{dashboardData.stats.totalRewrites || 0}</strong>
+          </div>
+          <div className="stat-card">
+            <span>Current plan</span>
+            <strong>{dashboardData.user?.plan || authState.user.plan || 'free'}</strong>
+          </div>
+          <div className="stat-card">
+            <span>Saved contacts</span>
+            <strong>{dashboardData.stats.contactCount || 0}</strong>
+          </div>
+        </div>
+
+        <div className="dashboard-grid">
+          <div className="dashboard-panel">
+            <h3>Recent rewrites</h3>
+            {dashboardData.rewrites?.length ? (
+              <ul className="rewrite-list">
+                {dashboardData.rewrites.map((rewrite) => (
+                  <li key={rewrite.id}>
+                    <div className="rewrite-tag">{rewrite.tone}</div>
+                    <p>{rewrite.output}</p>
+                    <small>{new Date(rewrite.created_at).toLocaleString()}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted-text">No rewrites saved yet. Try the demo and save your first version.</p>
+            )}
+          </div>
+
+          <div className="dashboard-panel">
+            <h3>Upgrade</h3>
+            <p className="muted-text">Unlock unlimited rewrites, premium tones, and team collaboration features.</p>
+            <button className="primary-button full-width" onClick={handleBilling}>Upgrade to Pro</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const routeView = (() => {
+    if (route === '#/login' || route === '#/signup') return renderAuth();
+    if (route === '#/dashboard') return renderDashboard();
+    return renderLanding();
+  })();
+
   return (
     <div className="page-shell">
       <header className="site-header">
         <div className="container nav-bar">
-          <div className="brand" aria-label="Humanizer AI home">
+          <a href="#/" className="brand" aria-label="Humanizer AI home">
             <span className="brand-mark">H</span>
             <span>Humanizer AI</span>
-          </div>
+          </a>
 
           <nav className="nav-links" aria-label="Main navigation">
-            <a href="#features">Features</a>
-            <a href="#workflow">Workflow</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#contact">Contact</a>
+            <a href="#/">Home</a>
+            <a href="#/">Features</a>
+            <a href="#/pricing">Pricing</a>
+            <a href="#/contact">Contact</a>
+            {authState.user ? <a href="#/dashboard">Dashboard</a> : <a href="#/login">Login</a>}
           </nav>
 
           <div className="nav-actions">
-            <a href="#demo" className="link-button">Demo</a>
-            <a href="#pricing" className="primary-button">Start free</a>
+            <a href="#/pricing" className="link-button">Pricing</a>
+            {authState.user ? (
+              <a href="#/dashboard" className="primary-button">Dashboard</a>
+            ) : (
+              <a href="#/signup" className="primary-button">Start free</a>
+            )}
           </div>
         </div>
       </header>
 
-      <main>
-        <section className="hero">
-          <div className="container hero-grid">
-            <div className="hero-copy">
-              <span className="eyebrow">Premium AI text refinement</span>
-              <h1>Make every sentence sound clear, polished, and human.</h1>
-              <p>
-                Humanizer AI transforms stiff, mechanical content into elegant, persuasive copy that feels like it was written by a real expert—not a template.
-              </p>
-
-              <div className="cta-row">
-                <a href="#demo" className="primary-button">Try the demo</a>
-                <a href="#features" className="secondary-button">See details</a>
-              </div>
-
-              <ul className="trust-list">
-                <li>Luxury brand voice</li>
-                <li>Fast AI rewriting</li>
-                <li>Built for premium teams</li>
-              </ul>
-            </div>
-
-            <div className="demo-panel" id="demo">
-              <div className="panel-head">
-                <span className="status-pill">Live rewrite</span>
-              </div>
-
-              <div className="tone-row">
-                <label htmlFor="toneSelect">Tone</label>
-                <select id="toneSelect" value={tone} onChange={(event) => setTone(event.target.value)}>
-                  {toneOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <textarea
-                value={sourceText}
-                onChange={(event) => setSourceText(event.target.value)}
-                rows={7}
-                aria-label="Text to humanize"
-              />
-
-              <div className="panel-actions">
-                <button className="primary-button" onClick={handleHumanize} disabled={loading}>
-                  {loading ? 'Rewriting...' : 'Humanize text'}
-                </button>
-                <button
-                  className="ghost-button"
-                  onClick={() => {
-                    setSourceText(defaultText);
-                    setResult('Our platform helps businesses move faster, think more clearly, and turn new ideas into real momentum.');
-                  }}
-                >
-                  Reset
-                </button>
-              </div>
-
-              <textarea value={result} readOnly rows={7} aria-label="Humanized output" />
-            </div>
-          </div>
-        </section>
-
-        <section className="logo-strip">
-          <div className="container strip-items">
-            <span>Veloura</span>
-            <span>Northstar</span>
-            <span>Atlas Co.</span>
-            <span>Luma Labs</span>
-            <span>Verve</span>
-          </div>
-        </section>
-
-        <section className="section" id="features">
-          <div className="container">
-            <div className="section-header">
-              <span className="eyebrow">Why teams choose it</span>
-              <h2>Luxury-level language refinement without the luxury price tag.</h2>
-            </div>
-
-            <div className="feature-grid">
-              {featureCards.map((card) => (
-                <article className="feature-card" key={card.title}>
-                  <div className="icon">{card.icon}</div>
-                  <h3>{card.title}</h3>
-                  <p>{card.text}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section alt-bg" id="workflow">
-          <div className="container">
-            <div className="section-header left">
-              <span className="eyebrow">Workflow</span>
-              <h2>Three steps from awkward draft to premium copy.</h2>
-            </div>
-
-            <div className="timeline">
-              <div className="step-card">
-                <span className="step-number">01</span>
-                <h3>Paste your text</h3>
-                <p>Drop in a sentence, paragraph, or brief from your marketing workflow.</p>
-              </div>
-              <div className="step-card">
-                <span className="step-number">02</span>
-                <h3>Choose your tone</h3>
-                <p>Switch between luxury, direct, or friendly phrasing to match your brand.</p>
-              </div>
-              <div className="step-card">
-                <span className="step-number">03</span>
-                <h3>Publish confidently</h3>
-                <p>Use sharper, more natural copy for launches, landing pages, and sales messaging.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" id="pricing">
-          <div className="container">
-            <div className="section-header">
-              <span className="eyebrow">Simple pricing</span>
-              <h2>Clear plans for individuals, founders, and teams.</h2>
-            </div>
-
-            <div className="pricing-grid">
-              {pricingPlans.map((plan) => (
-                <article className={`price-card ${plan.featured ? 'featured' : ''}`} key={plan.name}>
-                  {plan.featured && <div className="featured-badge">Most popular</div>}
-                  <p className="plan-name">{plan.name}</p>
-                  <div className="price-line">
-                    <span>{plan.price}</span>
-                    <small>{plan.note}</small>
-                  </div>
-                  <ul>
-                    {plan.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                  <button className={plan.featured ? 'primary-button full-width' : 'secondary-button full-width'}>
-                    {plan.action}
-                  </button>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section alt-bg" id="reviews">
-          <div className="container">
-            <div className="section-header">
-              <span className="eyebrow">Client feedback</span>
-              <h2>Trusted by brands that care about how they sound.</h2>
-            </div>
-
-            <div className="review-grid">
-              {reviewCards.map((review) => (
-                <blockquote className="review-card" key={review.author}>
-                  <p>“{review.quote}”</p>
-                  <footer>
-                    <strong>{review.author}</strong>
-                    <span>{review.role}</span>
-                  </footer>
-                </blockquote>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section contact-section" id="contact">
-          <div className="container contact-grid">
-            <div className="contact-copy">
-              <span className="eyebrow">Find your voice</span>
-              <h2>Need better copy for a launch, campaign, or homepage?</h2>
-              <p>
-                Tell us what you’re building and we’ll help you turn rough drafts into premium messaging that sounds credible and confident.
-              </p>
-            </div>
-
-            <form className="contact-form" onSubmit={handleContactSubmit}>
-              <div className="field-row">
-                <input
-                  type="text"
-                  placeholder="Your name"
-                  value={contactForm.name}
-                  onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })}
-                  required
-                />
-                <input
-                  type="email"
-                  placeholder="Email address"
-                  value={contactForm.email}
-                  onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })}
-                  required
-                />
-              </div>
-
-              <input
-                type="text"
-                placeholder="Company or brand"
-                value={contactForm.company}
-                onChange={(event) => setContactForm({ ...contactForm, company: event.target.value })}
-              />
-
-              <textarea
-                rows={5}
-                placeholder="Tell us about your project"
-                value={contactForm.message}
-                onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })}
-                required
-              />
-
-              <button type="submit" className="primary-button full-width">Send request</button>
-              {contactStatus && <p className="status-message">{contactStatus}</p>}
-            </form>
-          </div>
-        </section>
-      </main>
+      <main>{routeView}</main>
 
       <footer className="site-footer">
         <div className="container footer-content">
@@ -386,7 +550,7 @@ function App() {
             <span>Humanizer AI</span>
           </div>
           <p>Make every draft feel premium, natural, and unmistakably human.</p>
-          <a href="#pricing" className="primary-button">Get started</a>
+          <a href="#/signup" className="primary-button">Get started</a>
         </div>
       </footer>
     </div>

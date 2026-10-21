@@ -1,0 +1,386 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import OpenAI from 'openai';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import Database from 'better-sqlite3';
+import Stripe from 'stripe';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config();
+
+const app = express();
+const port = Number(process.env.PORT || 3001);
+const dbPath = path.join(process.cwd(), process.env.DATABASE_PATH || './data/humanizer.db');
+
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+const db = new Database(dbPath);
+db.pragma('journal_mode = WAL');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+const schema = `
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    plan TEXT DEFAULT 'free',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS rewrites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    input TEXT NOT NULL,
+    output TEXT NOT NULL,
+    tone TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    company TEXT,
+    message TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    stripe_customer_id TEXT,
+    stripe_subscription_id TEXT,
+    status TEXT DEFAULT 'inactive',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`;
+
+db.exec(schema);
+
+app.use(cors());
+app.use(express.json({ limit: '2mb' }));
+
+function signToken(user) {
+  return jwt.sign(
+    {
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      plan: user.plan,
+    },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
+
+function getAuthUser(req) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token) return null;
+
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
+function humanizeFallback(text, tone = 'luxury') {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+
+  const replacements = {
+    luxury: [
+      [/\bIn today’s fast-paced digital landscape,\b/gi, ''],
+      [/\bIt is important to note that\b/gi, ''],
+      [/\bIn order to\b/gi, 'To'],
+      [/\bseamlessly\b/gi, 'effortlessly'],
+      [/\bempowers\b/gi, 'helps'],
+      [/\bunlock new opportunities\b/gi, 'open new opportunities'],
+      [/\binnovative solutions\b/gi, 'practical solutions'],
+      [/\bdrive measurable results\b/gi, 'deliver real results'],
+    ],
+    corporate: [
+      [/\bIn today’s fast-paced digital landscape,\b/gi, ''],
+      [/\bIt is important to note that\b/gi, ''],
+      [/\bIn order to\b/gi, 'To'],
+      [/\bseamlessly\b/gi, 'smoothly'],
+      [/\bempowers\b/gi, 'helps'],
+      [/\binnovative solutions\b/gi, 'practical solutions'],
+      [/\bdrive measurable results\b/gi, 'deliver measurable outcomes'],
+    ],
+    friendly: [
+      [/\bIn today’s fast-paced digital landscape,\b/gi, ''],
+      [/\bIt is important to note that\b/gi, ''],
+      [/\bIn order to\b/gi, 'To'],
+      [/\butilize\b/gi, 'use'],
+      [/\bstate-of-the-art\b/gi, 'modern'],
+      [/\btransformative\b/gi, 'game-changing'],
+    ],
+  };
+
+  let result = clean;
+  const rules = replacements[tone] || replacements.luxury;
+
+  for (const [pattern, value] of rules) {
+    result = result.replace(pattern, value);
+  }
+
+  result = result.replace(/\s+/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+  return `${result.charAt(0).toUpperCase()}${result.slice(1)}.`;
+}
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'humanizer-ai',
+    mode: openai ? 'openai' : 'local-fallback',
+    database: 'sqlite',
+  });
+});
+
+app.post('/api/signup', (req, res) => {
+  const { name, email, password } = req.body || {};
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: 'Name, email, and password are required.' });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
+
+  if (existingUser) {
+    return res.status(409).json({ message: 'An account with that email already exists.' });
+  }
+
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const user = db.prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)').run(name.trim(), normalizedEmail, passwordHash);
+
+  const createdUser = db.prepare('SELECT id, name, email, plan FROM users WHERE id = ?').get(user.lastInsertRowid);
+  const token = signToken(createdUser);
+
+  return res.status(201).json({
+    token,
+    user: createdUser,
+  });
+});
+
+app.post('/api/login', (req, res) => {
+  const { email, password } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required.' });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = db.prepare('SELECT id, name, email, password_hash, plan FROM users WHERE email = ?').get(normalizedEmail);
+
+  if (!user) {
+    return res.status(401).json({ message: 'Invalid email or password.' });
+  }
+
+  const validPassword = bcrypt.compareSync(password, user.password_hash);
+
+  if (!validPassword) {
+    return res.status(401).json({ message: 'Invalid email or password.' });
+  }
+
+  const safeUser = { id: user.id, name: user.name, email: user.email, plan: user.plan };
+  const token = signToken(safeUser);
+
+  return res.json({
+    token,
+    user: safeUser,
+  });
+});
+
+app.get('/api/me', (req, res) => {
+  const userPayload = getAuthUser(req);
+
+  if (!userPayload) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  const user = db.prepare('SELECT id, name, email, plan FROM users WHERE id = ?').get(userPayload.sub);
+
+  if (!user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  return res.json({ user });
+});
+
+app.get('/api/dashboard', (req, res) => {
+  const userPayload = getAuthUser(req);
+
+  if (!userPayload) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  const user = db.prepare('SELECT id, name, email, plan FROM users WHERE id = ?').get(userPayload.sub);
+  if (!user) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  const rewrites = db.prepare('SELECT id, input, output, tone, created_at FROM rewrites WHERE user_id = ? ORDER BY created_at DESC LIMIT 12').all(user.id);
+  const totalRewrites = db.prepare('SELECT COUNT(*) AS count FROM rewrites WHERE user_id = ?').get(user.id).count;
+  const contactCount = db.prepare('SELECT COUNT(*) AS count FROM contacts').get().count;
+
+  return res.json({
+    user,
+    rewrites,
+    stats: {
+      totalRewrites,
+      contactCount,
+      plan: user.plan,
+    },
+  });
+});
+
+app.get('/api/rewrites', (req, res) => {
+  const userPayload = getAuthUser(req);
+  if (!userPayload) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  const rewrites = db.prepare('SELECT id, input, output, tone, created_at FROM rewrites WHERE user_id = ? ORDER BY created_at DESC LIMIT 25').all(userPayload.sub);
+  return res.json({ rewrites });
+});
+
+app.post('/api/rewrites', (req, res) => {
+  const userPayload = getAuthUser(req);
+  if (!userPayload) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  const { input, output, tone } = req.body || {};
+
+  if (!input || !output) {
+    return res.status(400).json({ message: 'Input and output are required.' });
+  }
+
+  const row = db.prepare('INSERT INTO rewrites (user_id, input, output, tone) VALUES (?, ?, ?, ?)').run(userPayload.sub, String(input).trim(), String(output).trim(), String(tone || 'luxury'));
+
+  const saved = db.prepare('SELECT id, input, output, tone, created_at FROM rewrites WHERE id = ?').get(row.lastInsertRowid);
+  return res.status(201).json({ rewrite: saved });
+});
+
+app.post('/api/humanize', async (req, res) => {
+  const { text, tone = 'luxury', intent = 'premium-marketing' } = req.body || {};
+
+  if (!text || !String(text).trim()) {
+    return res.status(400).json({ message: 'Text is required.' });
+  }
+
+  try {
+    if (openai) {
+      const prompt = `Rewrite the following text so it sounds natural, polished, and persuasive for a ${tone} tone. Keep the core meaning, remove robotic phrases, and make it sound premium and human.\n\nText:\n${text}`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.7,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a luxury copy editor. Rewrite text so it feels natural, confident, premium, and distinctly human without changing the meaning.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      });
+
+      const output = response.choices?.[0]?.message?.content?.trim();
+      if (output) {
+        return res.json({ text: output });
+      }
+    }
+
+    return res.json({ text: humanizeFallback(text, tone) });
+  } catch (error) {
+    console.error('Humanize error:', error);
+    return res.json({ text: humanizeFallback(text, tone) });
+  }
+});
+
+app.post('/api/contact', (req, res) => {
+  const { name, email, company, message } = req.body || {};
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ message: 'Name, email, and message are required.' });
+  }
+
+  db.prepare('INSERT INTO contacts (name, email, company, message) VALUES (?, ?, ?, ?)').run(String(name).trim(), String(email).trim().toLowerCase(), company ? String(company).trim() : '', String(message).trim());
+
+  return res.json({
+    ok: true,
+    message: 'Thanks! Your request has been received. We will be in touch shortly.',
+  });
+});
+
+app.post('/api/create-checkout-session', (req, res) => {
+  const userPayload = getAuthUser(req);
+  if (!userPayload) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  if (!stripe) {
+    return res.json({
+      ok: true,
+      demo: true,
+      url: '/#/pricing',
+      message: 'Stripe is not configured. Billing is in demo mode for now.',
+    });
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'Humanizer AI Pro' },
+          unit_amount: 2900,
+          recurring: { interval: 'month' },
+        },
+        quantity: 1,
+      },
+    ],
+    customer_email: userPayload.email,
+    success_url: `${process.env.PUBLIC_URL || 'http://localhost:5173'}/#/dashboard?checkout=success`,
+    cancel_url: `${process.env.PUBLIC_URL || 'http://localhost:5173'}/#/pricing`,
+    metadata: { userId: String(userPayload.sub) },
+  });
+
+  return res.json({ ok: true, url: session.url });
+});
+
+const distPath = path.join(__dirname, 'dist');
+
+app.use(express.static(distPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+
+  return res.sendFile(path.join(distPath, 'index.html'));
+});
+
+app.listen(port, () => {
+  console.log(`Humanizer server running on http://localhost:${port}`);
+});

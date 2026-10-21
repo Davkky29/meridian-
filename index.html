@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Humanizer Free helps transform stiff, robotic writing into natural, confident copy without sounding fake."
+    />
+    <title>Humanizer Free</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <div class="container nav">
+          <div class="brand" aria-label="Humanizer Free home">
+            <span class="brand-mark">H</span>
+            <span>Humanizer Free</span>
+          </div>
+
+          <nav class="nav-links" aria-label="Main navigation">
+            <a href="#features">Features</a>
+            <a href="#workflow">How it works</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#reviews">Reviews</a>
+          </nav>
+
+          <div class="nav-actions">
+            <a class="link-button" href="#demo">Demo</a>
+            <a class="primary-button" href="#pricing">Start free</a>
+          </div>
+
+          <button class="mobile-toggle" aria-label="Toggle menu" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div class="container hero-grid">
+            <div class="hero-copy">
+              <span class="eyebrow">Write like a person. Not a bot.</span>
+              <h1>Make AI text sound clear, natural, and human.</h1>
+              <p>
+                Humanizer Free helps writers, marketers, and teams turn clunky AI output into
+                confident, readable copy that feels authentic from the first sentence.
+              </p>
+
+              <div class="cta-row">
+                <a class="primary-button" href="#demo">Try the demo</a>
+                <a class="secondary-button" href="#features">See features</a>
+              </div>
+
+              <ul class="trust-list" aria-label="Key benefits">
+                <li>Built for content teams</li>
+                <li>Simple, fast, and free to try</li>
+                <li>No robotic wording</li>
+              </ul>
+            </div>
+
+            <div class="hero-card" id="demo">
+              <div class="card-header">
+                <span class="status-dot"></span>
+                <span>Live rewrite</span>
+              </div>
+
+              <label class="field-label" for="sourceText">Input text</label>
+              <textarea id="sourceText" rows="7">In today’s fast-paced digital landscape, it is important to note that our platform seamlessly empowers businesses to unlock new opportunities through innovative solutions that drive measurable results.</textarea>
+
+              <div class="actions-row">
+                <button id="rewriteBtn" class="primary-button small">Make it natural</button>
+                <button id="resetBtn" class="ghost-button small">Reset</button>
+              </div>
+
+              <label class="field-label" for="resultText">Result</label>
+              <textarea id="resultText" rows="7" readonly>Our platform helps businesses move faster, make smarter decisions, and turn new ideas into measurable results.</textarea>
+            </div>
+          </div>
+        </section>
+
+        <section class="logo-strip" aria-label="Used by teams">
+          <div class="container strip-items">
+            <span>BrandPilot</span>
+            <span>Northstar Studio</span>
+            <span>Graphite Labs</span>
+            <span>Northlane</span>
+            <span>Verve</span>
+          </div>
+        </section>
+
+        <section id="features" class="features section">
+          <div class="container">
+            <div class="section-header">
+              <span class="eyebrow">Why creators switch</span>
+              <h2>Built to sound more like people and less like templates.</h2>
+            </div>
+
+            <div class="feature-grid">
+              <article class="feature-card">
+                <div class="icon">✦</div>
+                <h3>Natural tone</h3>
+                <p>Removes filler and recycled phrases so your copy feels more human, direct, and believable.</p>
+              </article>
+
+              <article class="feature-card">
+                <div class="icon">↗</div>
+                <h3>Better clarity</h3>
+                <p>Turns verbose AI language into sharper structure, stronger flow, and tighter messaging.</p>
+              </article>
+
+              <article class="feature-card">
+                <div class="icon">⚡</div>
+                <h3>Fast editing</h3>
+                <p>Generate polished text in seconds and keep your team moving without second-guessing every sentence.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="workflow" class="workflow section alt-bg">
+          <div class="container">
+            <div class="section-header left">
+              <span class="eyebrow">Simple workflow</span>
+              <h2>Turn rough draft into readable copy in three steps.</h2>
+            </div>
+
+            <div class="timeline">
+              <div class="step">
+                <span class="step-number">01</span>
+                <h3>Paste text</h3>
+                <p>Drop in a draft, paragraph, or description from your AI workflow.</p>
+              </div>
+              <div class="step">
+                <span class="step-number">02</span>
+                <h3>Refine tone</h3>
+                <p>Apply a more conversational and human style without losing intent.</p>
+              </div>
+              <div class="step">
+                <span class="step-number">03</span>
+                <h3>Publish with confidence</h3>
+                <p>Use the final version for landing pages, emails, blogs, and product messaging.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" class="pricing section">
+          <div class="container">
+            <div class="section-header">
+              <span class="eyebrow">Simple plans</span>
+              <h2>Start free and scale when you need more.</h2>
+            </div>
+
+            <div class="pricing-grid">
+              <article class="price-card">
+                <p class="plan-name">Free</p>
+                <div class="price"><span>$0</span><small>/month</small></div>
+                <ul>
+                  <li>5 rewrites per day</li>
+                  <li>Basic tone cleanup</li>
+                  <li>Limited exports</li>
+                </ul>
+                <button class="secondary-button full">Get started</button>
+              </article>
+
+              <article class="price-card featured">
+                <div class="featured-badge">Most popular</div>
+                <p class="plan-name">Pro</p>
+                <div class="price"><span>$19</span><small>/month</small></div>
+                <ul>
+                  <li>Unlimited rewrites</li>
+                  <li>Brand voice controls</li>
+                  <li>Priority support</li>
+                </ul>
+                <button class="primary-button full">Start free trial</button>
+              </article>
+
+              <article class="price-card">
+                <p class="plan-name">Team</p>
+                <div class="price"><span>$49</span><small>/month</small></div>
+                <ul>
+                  <li>Shared workspace</li>
+                  <li>Team templates</li>
+                  <li>Admin controls</li>
+                </ul>
+                <button class="secondary-button full">Contact sales</button>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="reviews" class="reviews section alt-bg">
+          <div class="container">
+            <div class="section-header">
+              <span class="eyebrow">Loved by teams</span>
+              <h2>People use it to make AI writing feel more real.</h2>
+            </div>
+
+            <div class="review-grid">
+              <blockquote class="review-card">
+                “Humanizer Free helped us turn robotic product copy into messaging people actually trust.”
+                <footer>— Maya Chen, Growth Lead</footer>
+              </blockquote>
+              <blockquote class="review-card">
+                “The rewrite quality is surprisingly natural. It feels like a sharp editor, not a script.”
+                <footer>— Jordan Lee, Marketing Manager</footer>
+              </blockquote>
+              <blockquote class="review-card">
+                “We use it for emails, landing pages, and internal docs. It saves hours of cleanup.”
+                <footer>— Priya Singh, Operations</footer>
+              </blockquote>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="container footer-content">
+          <div class="brand footer-brand">
+            <span class="brand-mark">H</span>
+            <span>Humanizer Free</span>
+          </div>
+          <p>Make every draft feel natural, relevant, and human.</p>
+          <a href="#pricing" class="primary-button">Try it now</a>
+        </div>
+      </footer>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

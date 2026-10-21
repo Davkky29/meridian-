@@ -1,0 +1,396 @@
+import { useMemo, useState } from 'react';
+
+const defaultText = `In today’s fast-paced digital landscape, it is important to note that our platform seamlessly empowers businesses to unlock new opportunities through innovative solutions that drive measurable results.`;
+
+const featureCards = [
+  {
+    icon: '✦',
+    title: 'Premium voice refinement',
+    text: 'Turn mechanical copy into elegant, persuasive language that feels authored by a real strategist.',
+  },
+  {
+    icon: '↗',
+    title: 'Sharper clarity',
+    text: 'Cut filler, simplify dense wording, and sharpen the message without losing brand depth.',
+  },
+  {
+    icon: '⚡',
+    title: 'Faster production',
+    text: 'Give your team quick, polished drafts for website copy, sales pages, emails, and launch assets.',
+  },
+];
+
+const pricingPlans = [
+  {
+    name: 'Starter',
+    price: '$0',
+    note: '/month',
+    items: ['10 rewrites per month', 'Basic tone cleanup', 'One workspace'],
+    featured: false,
+    action: 'Start free',
+  },
+  {
+    name: 'Pro',
+    price: '$29',
+    note: '/month',
+    items: ['Unlimited rewrites', 'Brand voice presets', 'Priority output quality'],
+    featured: true,
+    action: 'Start trial',
+  },
+  {
+    name: 'Studio',
+    price: '$79',
+    note: '/month',
+    items: ['Team workspace', 'Shared templates', 'Priority support'],
+    featured: false,
+    action: 'Book demo',
+  },
+];
+
+const reviewCards = [
+  {
+    quote: 'The copy quality feels editorial and premium. It turned our robotic drafts into language people actually trust.',
+    author: 'Maya Chen',
+    role: 'Brand Director',
+  },
+  {
+    quote: 'This is the first AI writing tool I’ve used that sounds confident without sounding artificial.',
+    author: 'Ethan Brooks',
+    role: 'Growth Lead',
+  },
+  {
+    quote: 'We use it for product messaging, campaigns, and investor updates. It saves hours and feels elevated.',
+    author: 'Priya Shah',
+    role: 'Marketing Partner',
+  },
+];
+
+function App() {
+  const [sourceText, setSourceText] = useState(defaultText);
+  const [result, setResult] = useState('Our platform helps businesses move faster, make smarter decisions, and turn challenging ideas into real momentum.');
+  const [tone, setTone] = useState('luxury');
+  const [loading, setLoading] = useState(false);
+  const [contactStatus, setContactStatus] = useState('');
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    company: '',
+    message: '',
+  });
+
+  const toneOptions = useMemo(
+    () => [
+      { value: 'luxury', label: 'Luxury' },
+      { value: 'corporate', label: 'Corporate' },
+      { value: 'friendly', label: 'Friendly' },
+    ],
+    []
+  );
+
+  async function handleHumanize() {
+    const trimmed = sourceText.trim();
+    if (!trimmed) {
+      setResult('Add a paragraph to humanize.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/humanize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimmed, tone, intent: 'premium-marketing' }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to rewrite text.');
+
+      setResult(data.text || trimmed);
+    } catch (error) {
+      setResult(
+        'Our platform helps businesses move faster, think more clearly, and turn new ideas into measurable momentum.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleContactSubmit(event) {
+    event.preventDefault();
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactForm),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Unable to send message.');
+
+      setContactStatus(data.message || 'Message sent successfully.');
+      setContactForm({ name: '', email: '', company: '', message: '' });
+    } catch (error) {
+      setContactStatus(error.message || 'Unable to send message.');
+    }
+  }
+
+  return (
+    <div className="page-shell">
+      <header className="site-header">
+        <div className="container nav-bar">
+          <div className="brand" aria-label="Humanizer AI home">
+            <span className="brand-mark">H</span>
+            <span>Humanizer AI</span>
+          </div>
+
+          <nav className="nav-links" aria-label="Main navigation">
+            <a href="#features">Features</a>
+            <a href="#workflow">Workflow</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#contact">Contact</a>
+          </nav>
+
+          <div className="nav-actions">
+            <a href="#demo" className="link-button">Demo</a>
+            <a href="#pricing" className="primary-button">Start free</a>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section className="hero">
+          <div className="container hero-grid">
+            <div className="hero-copy">
+              <span className="eyebrow">Premium AI text refinement</span>
+              <h1>Make every sentence sound clear, polished, and human.</h1>
+              <p>
+                Humanizer AI transforms stiff, mechanical content into elegant, persuasive copy that feels like it was written by a real expert—not a template.
+              </p>
+
+              <div className="cta-row">
+                <a href="#demo" className="primary-button">Try the demo</a>
+                <a href="#features" className="secondary-button">See details</a>
+              </div>
+
+              <ul className="trust-list">
+                <li>Luxury brand voice</li>
+                <li>Fast AI rewriting</li>
+                <li>Built for premium teams</li>
+              </ul>
+            </div>
+
+            <div className="demo-panel" id="demo">
+              <div className="panel-head">
+                <span className="status-pill">Live rewrite</span>
+              </div>
+
+              <div className="tone-row">
+                <label htmlFor="toneSelect">Tone</label>
+                <select id="toneSelect" value={tone} onChange={(event) => setTone(event.target.value)}>
+                  {toneOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <textarea
+                value={sourceText}
+                onChange={(event) => setSourceText(event.target.value)}
+                rows={7}
+                aria-label="Text to humanize"
+              />
+
+              <div className="panel-actions">
+                <button className="primary-button" onClick={handleHumanize} disabled={loading}>
+                  {loading ? 'Rewriting...' : 'Humanize text'}
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    setSourceText(defaultText);
+                    setResult('Our platform helps businesses move faster, think more clearly, and turn new ideas into real momentum.');
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+
+              <textarea value={result} readOnly rows={7} aria-label="Humanized output" />
+            </div>
+          </div>
+        </section>
+
+        <section className="logo-strip">
+          <div className="container strip-items">
+            <span>Veloura</span>
+            <span>Northstar</span>
+            <span>Atlas Co.</span>
+            <span>Luma Labs</span>
+            <span>Verve</span>
+          </div>
+        </section>
+
+        <section className="section" id="features">
+          <div className="container">
+            <div className="section-header">
+              <span className="eyebrow">Why teams choose it</span>
+              <h2>Luxury-level language refinement without the luxury price tag.</h2>
+            </div>
+
+            <div className="feature-grid">
+              {featureCards.map((card) => (
+                <article className="feature-card" key={card.title}>
+                  <div className="icon">{card.icon}</div>
+                  <h3>{card.title}</h3>
+                  <p>{card.text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section alt-bg" id="workflow">
+          <div className="container">
+            <div className="section-header left">
+              <span className="eyebrow">Workflow</span>
+              <h2>Three steps from awkward draft to premium copy.</h2>
+            </div>
+
+            <div className="timeline">
+              <div className="step-card">
+                <span className="step-number">01</span>
+                <h3>Paste your text</h3>
+                <p>Drop in a sentence, paragraph, or brief from your marketing workflow.</p>
+              </div>
+              <div className="step-card">
+                <span className="step-number">02</span>
+                <h3>Choose your tone</h3>
+                <p>Switch between luxury, direct, or friendly phrasing to match your brand.</p>
+              </div>
+              <div className="step-card">
+                <span className="step-number">03</span>
+                <h3>Publish confidently</h3>
+                <p>Use sharper, more natural copy for launches, landing pages, and sales messaging.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="pricing">
+          <div className="container">
+            <div className="section-header">
+              <span className="eyebrow">Simple pricing</span>
+              <h2>Clear plans for individuals, founders, and teams.</h2>
+            </div>
+
+            <div className="pricing-grid">
+              {pricingPlans.map((plan) => (
+                <article className={`price-card ${plan.featured ? 'featured' : ''}`} key={plan.name}>
+                  {plan.featured && <div className="featured-badge">Most popular</div>}
+                  <p className="plan-name">{plan.name}</p>
+                  <div className="price-line">
+                    <span>{plan.price}</span>
+                    <small>{plan.note}</small>
+                  </div>
+                  <ul>
+                    {plan.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                  <button className={plan.featured ? 'primary-button full-width' : 'secondary-button full-width'}>
+                    {plan.action}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section alt-bg" id="reviews">
+          <div className="container">
+            <div className="section-header">
+              <span className="eyebrow">Client feedback</span>
+              <h2>Trusted by brands that care about how they sound.</h2>
+            </div>
+
+            <div className="review-grid">
+              {reviewCards.map((review) => (
+                <blockquote className="review-card" key={review.author}>
+                  <p>“{review.quote}”</p>
+                  <footer>
+                    <strong>{review.author}</strong>
+                    <span>{review.role}</span>
+                  </footer>
+                </blockquote>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section contact-section" id="contact">
+          <div className="container contact-grid">
+            <div className="contact-copy">
+              <span className="eyebrow">Find your voice</span>
+              <h2>Need better copy for a launch, campaign, or homepage?</h2>
+              <p>
+                Tell us what you’re building and we’ll help you turn rough drafts into premium messaging that sounds credible and confident.
+              </p>
+            </div>
+
+            <form className="contact-form" onSubmit={handleContactSubmit}>
+              <div className="field-row">
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={contactForm.name}
+                  onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })}
+                  required
+                />
+                <input
+                  type="email"
+                  placeholder="Email address"
+                  value={contactForm.email}
+                  onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })}
+                  required
+                />
+              </div>
+
+              <input
+                type="text"
+                placeholder="Company or brand"
+                value={contactForm.company}
+                onChange={(event) => setContactForm({ ...contactForm, company: event.target.value })}
+              />
+
+              <textarea
+                rows={5}
+                placeholder="Tell us about your project"
+                value={contactForm.message}
+                onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })}
+                required
+              />
+
+              <button type="submit" className="primary-button full-width">Send request</button>
+              {contactStatus && <p className="status-message">{contactStatus}</p>}
+            </form>
+          </div>
+        </section>
+      </main>
+
+      <footer className="site-footer">
+        <div className="container footer-content">
+          <div className="brand footer-brand">
+            <span className="brand-mark">H</span>
+            <span>Humanizer AI</span>
+          </div>
+          <p>Make every draft feel premium, natural, and unmistakably human.</p>
+          <a href="#pricing" className="primary-button">Get started</a>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
